@@ -90,10 +90,29 @@ def main() -> None:
         type=str,
         help="Name of the experiment you are running (no default)",
     )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="fedAvg",
+        help="Name of the strategy you are running (default: fedAvg)",
+    )
+    
+    parser.add_argument(
+        "--q_param",
+        type=float,
+        help="Q param for QFFedAvg",
+    )
+    
+    parser.add_argument(
+        "--qffl_learning_rate",
+        type=float,
+        help="Learning_rate for QFFedAvg",
+    )
+    
     args = parser.parse_args()
     dict_args = vars(args)
     if not args.exp_name:
-        tags = ['rounds', 'epochs', 'min_num_clients', 'min_sample_size', 'sample_fraction']
+        tags = ['strategy', 'rounds', 'epochs', 'min_num_clients', 'min_sample_size', 'sample_fraction']
         params = '_'.join([f'{tag}_{dict_args[tag]}' for tag in tags])
         args.exp_name=f'federated_' + params
 
@@ -106,14 +125,7 @@ def main() -> None:
 
     # Create client_manager, strategy, and server
     client_manager = fl.server.SimpleClientManager()
-    strategy = fl.server.strategy.DefaultStrategy(
-        fraction_fit=args.sample_fraction,
-        min_fit_clients=args.min_sample_size,
-        min_available_clients=args.min_num_clients,
-        eval_fn= get_eval_fn(testset),
-        on_fit_config_fn=generate_config(args),
-        on_evaluate_config_fn=generate_config(args)
-    )
+    strategy = get_strategy(args, testset);
     server = fl.server.Server(client_manager=client_manager, strategy=strategy)
     
     # Run server 
@@ -185,6 +197,42 @@ def get_eval_fn(
         return cifar.test(net=model, testloader=testloader, device = DEVICE)
 
     return evaluate
+
+
+def get_strategy(
+    args,
+    testset: torchvision.datasets.CIFAR10
+) -> fl.server.strategy.Strategy:
+    if args.strategy == "fedAvg":
+        return fl.server.strategy.FedAvg(
+        fraction_fit=args.sample_fraction,
+        fraction_eval=args.sample_fraction,
+        min_fit_clients=args.min_sample_size,
+        min_eval_clients=args.min_sample_size,
+        min_available_clients=args.min_num_clients,
+        eval_fn= get_eval_fn(testset),
+        on_fit_config_fn=generate_config(args),
+        on_evaluate_config_fn=generate_config(args)
+        )
+    elif args.strategy == "qffedAvg":
+        if not args.q_param:
+            args.q_param = 0.2
+        if not args.qffl_learning_rate:
+            args.qffl_learning_rate = 0.1
+        
+        return fl.server.strategy.QffedAvg(
+        q_param = args.q_param,
+        qffl_learning_rate = args.qffl_learning_rate,
+        fraction_fit=args.sample_fraction,   
+        fraction_eval=args.sample_fraction,
+        min_fit_clients=args.min_sample_size,
+        min_eval_clients=args.min_sample_size,
+        min_available_clients=args.min_num_clients,
+        eval_fn= get_eval_fn(testset),
+        on_fit_config_fn=generate_config(args),
+        on_evaluate_config_fn=generate_config(args)
+        )
+
 
 
 if __name__ == "__main__":

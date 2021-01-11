@@ -28,7 +28,7 @@ do
       --server_address=$SERVER_ADDRESS \
       --num_partitions=${NUM_CLIENTS} \
       --iid_fraction=1.0 \
-      --exp_name="federated_${NUM_CLIENTS}_clients" &
+      --exp_name="QFedavg_federated_${NUM_CLIENTS}_clients" &
 done
 echo "Started $NUM_CLIENTS clients."
 

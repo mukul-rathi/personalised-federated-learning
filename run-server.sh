@@ -21,5 +21,8 @@ python3.7 server.py \
   --epochs=1 \
   --sample_fraction=1.0 \
   --min_sample_size=5 \
-  --min_num_clients=5
+  --min_num_clients=5 \
+  --strategy="qffedAvg" \
+  --q_param=0.2 \
+  --qffl_learning_rate=0.1
 
