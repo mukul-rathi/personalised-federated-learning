@@ -83,7 +83,7 @@ def main() -> None:
         "--batch_size",
         type=int,
         default=32,
-        help="Number of epochs each client will train for (default: 10)",
+        help="Batch size used when training each client (default: 32)",
     )   
     parser.add_argument(
         "--exp_name",
@@ -115,13 +115,6 @@ def main() -> None:
         on_evaluate_config_fn=generate_config(args)
     )
     server = fl.server.Server(client_manager=client_manager, strategy=strategy)
-
-    # Run server
-    #fl.server.start_server(
-    #    args.server_address,
-    #    server,
-    #    config={"num_rounds": args.rounds},
-    #)
     
     # Run server 
     grpc_server = start_insecure_grpc_server(
