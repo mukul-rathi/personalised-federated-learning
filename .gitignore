@@ -1,3 +1,8 @@
+# original lab files
+federated_learning_with_bash.ipynb
+figures/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
