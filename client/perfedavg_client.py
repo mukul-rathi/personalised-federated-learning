@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from typing import Optional
+import itertools as it
 import timeit
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -10,6 +11,10 @@ import flwr as fl
 from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes, Weights
 
 DEVICE = torch.device("cpu")
+
+def pairwise(iterable):
+    a = iter(iterable)
+    return it.izip(a, a)
 
 
 class PerFedAvgClient(fl.client.Client):
@@ -36,7 +41,7 @@ class PerFedAvgClient(fl.client.Client):
         self.alpha = alpha if alpha else 1e-2
         self.beta = beta if beta else 1e-3
 
-
+    
     def get_parameters(self) -> ParametersRes:
         print(f"Client {self.cid}: get_parameters")
 
@@ -44,6 +49,59 @@ class PerFedAvgClient(fl.client.Client):
         parameters = fl.common.weights_to_parameters(weights)
         return ParametersRes(parameters=parameters)
 
+    def train(
+            net : cifar.Net,
+            trainloader: torch.utils.data.DataLoader,
+            device: torch.device,
+            start_epoch: int,
+            end_epoch: int
+        ) -> List[Tuple[float, float]]:
+        """Train the network."""
+        # Define loss and optimizer
+        criterion = nn.CrossEntropyLoss()
+        alpha_optimizer = torch.optim.SGD(net.parameters(), lr=self.alpha)
+        beta_optimizer = torch.optim.SGD(net.parameters(), lr=self.beta)
+
+        print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
+        results = []
+        # Train the network
+        for idx, epoch in enumerate(range(start_epoch, end_epoch+1)):  # loop over the dataset multiple times, last epoch inclusive
+            running_loss = 0.0
+            running_acc  = 0.0
+            total = 0
+            pbar = tqdm(trainloader, 0)
+            for (data1, data2) in pairwise(pbar):
+                pbar.set_description(f'Epoch {epoch}: Training...')
+                images1, labels1 = data1[0].to(device), data1[1].to(device)
+                images2, labels2 = data2[0].to(device), data2[1].to(device)
+
+                # zero the parameter gradients
+                alpha_optimizer.zero_grad()
+
+                # forward + backward + optimize
+                outputs = net(images1)
+                loss = criterion(outputs, labels1)
+                loss.backward()
+                alpha_optimizer.step()
+                
+                beta_optimizer.zero_grad()
+
+                # forward + backward + optimize
+                outputs = net(images2)
+                loss = criterion(outputs, labels2)
+                loss.backward()
+                beta_optimizer.step()
+
+                # collect statistics
+                running_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1) 
+                total += labels.size(0)
+                running_acc += (predicted == labels).sum().item()
+
+            results.append((running_loss/total, running_acc/total))    
+
+        return results 
+    
     def fit(self, ins: FitIns) -> FitRes:
         print(f"Client {self.cid}: fit")
 
@@ -74,7 +132,9 @@ class PerFedAvgClient(fl.client.Client):
         start_epoch = epoch_global+1
         end_epoch = start_epoch + epochs-1
         results_fit = self.model.train(trainloader = trainloader, 
-                                            device = DEVICE, start_epoch=start_epoch, end_epoch = end_epoch)
+                                        device = DEVICE, 
+                                       start_epoch=start_epoch, end_epoch = end_epoch)
+        
         # Write to tensorboard 
         with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
             for idx, result in enumerate(results_fit, start_epoch):
@@ -108,12 +168,25 @@ class PerFedAvgClient(fl.client.Client):
 
         # Use provided weights to update the local model
         self.model.set_weights(weights)
-
-        # Evaluate the updated model on the local dataset
+        
+        
+        # Get test dataset
         testloader = torch.utils.data.DataLoader(
-            self.testset, batch_size=32, shuffle=False
+            self.testset, batch_size=32, shuffle=True
         )
         
+        # Take one step (personalise model)
+        optimizer = torch.optim.SGD(net.parameters(), lr=self.alpha)
+        optimizer.zero_grad()
+        # forward + backward + optimize
+        data = next(testloader)
+        images, labels = data[0].to(device), data[1].to(device)
+        outputs = self.model(images)
+        loss = nn.CrossEntropyLoss()(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        
+        # Evaluate the updated model on the local dataset
         loss, accuracy = test(net=self.model, testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
 
         # Return the number of evaluation examples and the evaluation result (loss)
