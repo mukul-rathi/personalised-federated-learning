@@ -18,6 +18,7 @@
 
 SERVER_ADDRESS="[::]:8080"
 NUM_CLIENTS=5 # <---Change the number of clients here
+STRATEGY="perFedAvg"
 
 echo "Starting $NUM_CLIENTS clients."
 for ((i = 0; i < $NUM_CLIENTS; i++))
@@ -28,7 +29,8 @@ do
       --server_address=$SERVER_ADDRESS \
       --num_partitions=${NUM_CLIENTS} \
       --iid_fraction=1.0 \
-      --exp_name="QFedavg_federated_${NUM_CLIENTS}_clients" &
+      --strategy=$STRATEGY \
+      --exp_name="${STRATEGY}_federated_${NUM_CLIENTS}_clients" &
 done
 echo "Started $NUM_CLIENTS clients."
 

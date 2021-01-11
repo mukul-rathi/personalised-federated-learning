@@ -76,6 +76,74 @@ class Net(nn.Module):
             {k: torch.Tensor(v) for k, v in zip(self.state_dict().keys(), weights)}
         )
         self.load_state_dict(state_dict, strict=True)
+    
+    def train(
+        self,
+        trainloader: torch.utils.data.DataLoader,
+        device: torch.device,
+        start_epoch: int,
+        end_epoch: int
+    ) -> List[Tuple[float, float]]:
+        """Train the network."""
+        # Define loss and optimizer
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
+
+        print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
+        results = []
+        # Train the network
+        for idx, epoch in enumerate(range(start_epoch, end_epoch+1)):  # loop over the dataset multiple times, last epoch inclusive
+            running_loss = 0.0
+            running_acc  = 0.0
+            total = 0
+            pbar = tqdm(trainloader, 0)
+            for data in pbar:
+                pbar.set_description(f'Epoch {epoch}: Training...')
+                images, labels = data[0].to(device), data[1].to(device)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
+                # forward + backward + optimize
+                outputs = self(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+
+                # collect statistics
+                running_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1) 
+                total += labels.size(0)
+                running_acc += (predicted == labels).sum().item()
+
+            results.append((running_loss/total, running_acc/total))    
+
+        return results      
+
+    def test(
+        self,
+        testloader: torch.utils.data.DataLoader,
+        device: torch.device,
+    ) -> Tuple[float, float]:
+        """Validate the network on the entire test set."""
+        criterion = nn.CrossEntropyLoss()
+        correct = 0.0
+        total = 0
+        loss = 0.0
+        with torch.no_grad():
+            pbar = tqdm(testloader)
+            for idx, data in enumerate(pbar):
+                pbar.set_description(f'Testing...')
+                images, labels = data[0].to(device), data[1].to(device)
+                outputs = self(images)
+                loss += criterion(outputs, labels).item() #Average?
+                _, predicted = torch.max(outputs.data, 1) 
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()  
+
+        return (loss/total, correct/total)
+
+
 
 
 def load_model() -> Net:
@@ -140,70 +208,4 @@ def load_local_partitioned_data(cid:int, iid_fraction: float, num_partitions: in
     return torch_partition_trainset, torch_partition_testset
 
 
-def train(
-    net: Net,
-    trainloader: torch.utils.data.DataLoader,
-    device: torch.device,
-    start_epoch: int,
-    end_epoch: int
-) -> List[Tuple[float, float]]:
-    """Train the network."""
-    # Define loss and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-
-    print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
-    results = []
-    # Train the network
-    for idx, epoch in enumerate(range(start_epoch, end_epoch+1)):  # loop over the dataset multiple times, last epoch inclusive
-        running_loss = 0.0
-        running_acc  = 0.0
-        total = 0
-        pbar = tqdm(trainloader, 0)
-        for data in pbar:
-            pbar.set_description(f'Epoch {epoch}: Training...')
-            images, labels = data[0].to(device), data[1].to(device)
-
-            # zero the parameter gradients
-            optimizer.zero_grad()
-
-            # forward + backward + optimize
-            outputs = net(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            # collect statistics
-            running_loss += loss.item()
-            _, predicted = torch.max(outputs.data, 1) 
-            total += labels.size(0)
-            running_acc += (predicted == labels).sum().item()
-            
-        results.append((running_loss/total, running_acc/total))    
-        
-    return results      
-    
-def test(
-    net: Net,
-    testloader: torch.utils.data.DataLoader,
-    device: torch.device,
-) -> Tuple[float, float]:
-    """Validate the network on the entire test set."""
-    criterion = nn.CrossEntropyLoss()
-    correct = 0.0
-    total = 0
-    loss = 0.0
-    with torch.no_grad():
-        pbar = tqdm(testloader)
-        for idx, data in enumerate(pbar):
-            pbar.set_description(f'Testing...')
-            images, labels = data[0].to(device), data[1].to(device)
-            outputs = net(images)
-            loss += criterion(outputs, labels).item() #Average?
-            _, predicted = torch.max(outputs.data, 1) 
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()  
-    
-    return (loss/total, correct/total)
-    
 
