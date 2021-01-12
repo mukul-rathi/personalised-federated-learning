@@ -1,11 +1,15 @@
 from collections import OrderedDict
-from typing import Optional
+from typing import Callable, Dict, Optional, Tuple, List
 import itertools as it
 import timeit
 from torch.utils.tensorboard import SummaryWriter
 import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torchvision
 from models import cifar
+from tqdm import tqdm
+
 
 import flwr as fl
 from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes, Weights
@@ -13,9 +17,10 @@ from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes,
 DEVICE = torch.device("cpu")
 
 def pairwise(iterable):
-    a = iter(iterable)
-    return it.izip(a, a)
-
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = it.tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
 class PerFedAvgClient(fl.client.Client):
     """PerFedAvgClient Flower client using a personalised local model's weights."""
@@ -26,11 +31,9 @@ class PerFedAvgClient(fl.client.Client):
         model: cifar.Net,
         trainset: torchvision.datasets.CIFAR10,
         testset: torchvision.datasets.CIFAR10,
-        alpha: float,
-        beta: float,
         exp_name: Optional[str],
-        iid_fraction: Optional[float]
-        alpha: Optional[float]
+        iid_fraction: Optional[float],
+        alpha: Optional[float],
         beta: Optional[float]
     ) -> None:
         self.cid = cid
@@ -50,7 +53,7 @@ class PerFedAvgClient(fl.client.Client):
         return ParametersRes(parameters=parameters)
 
     def train(
-            net : cifar.Net,
+            self,
             trainloader: torch.utils.data.DataLoader,
             device: torch.device,
             start_epoch: int,
@@ -59,8 +62,8 @@ class PerFedAvgClient(fl.client.Client):
         """Train the network."""
         # Define loss and optimizer
         criterion = nn.CrossEntropyLoss()
-        alpha_optimizer = torch.optim.SGD(net.parameters(), lr=self.alpha)
-        beta_optimizer = torch.optim.SGD(net.parameters(), lr=self.beta)
+        alpha_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.alpha)
+        beta_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.beta)
 
         print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
         results = []
@@ -79,24 +82,23 @@ class PerFedAvgClient(fl.client.Client):
                 alpha_optimizer.zero_grad()
 
                 # forward + backward + optimize
-                outputs = net(images1)
-                loss = criterion(outputs, labels1)
+                
+                outputs1 = self.model(images1)
+                loss = criterion(outputs1, labels1)
                 loss.backward()
                 alpha_optimizer.step()
                 
                 beta_optimizer.zero_grad()
-
-                # forward + backward + optimize
-                outputs = net(images2)
-                loss = criterion(outputs, labels2)
+                outputs2 = self.model(images2)
+                loss = criterion(outputs2, labels2)
                 loss.backward()
                 beta_optimizer.step()
 
                 # collect statistics
-                running_loss += loss.item()
-                _, predicted = torch.max(outputs.data, 1) 
-                total += labels.size(0)
-                running_acc += (predicted == labels).sum().item()
+                running_loss += loss.item() # get loss of f(w - alpha*grad)
+                _, predicted2 = torch.max(outputs2.data, 1) 
+                total += labels1.size(0)
+                running_acc += (predicted2 == labels2).sum().item()
 
             results.append((running_loss/total, running_acc/total))    
 
@@ -131,7 +133,7 @@ class PerFedAvgClient(fl.client.Client):
         
         start_epoch = epoch_global+1
         end_epoch = start_epoch + epochs-1
-        results_fit = self.model.train(trainloader = trainloader, 
+        results_fit = self.train(trainloader = trainloader, 
                                         device = DEVICE, 
                                        start_epoch=start_epoch, end_epoch = end_epoch)
         
@@ -176,7 +178,7 @@ class PerFedAvgClient(fl.client.Client):
         )
         
         # Take one step (personalise model)
-        optimizer = torch.optim.SGD(net.parameters(), lr=self.alpha)
+        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.alpha)
         optimizer.zero_grad()
         # forward + backward + optimize
         data = next(testloader)
@@ -187,7 +189,7 @@ class PerFedAvgClient(fl.client.Client):
         optimizer.step()
         
         # Evaluate the updated model on the local dataset
-        loss, accuracy = test(net=self.model, testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
+        loss, accuracy =self.model.test(testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
 
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(

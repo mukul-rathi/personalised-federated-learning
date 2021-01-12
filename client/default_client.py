@@ -1,10 +1,14 @@
 from collections import OrderedDict
-from typing import Optional
+from typing import Callable, Dict, Optional, Tuple, List
+import itertools as it
 import timeit
 from torch.utils.tensorboard import SummaryWriter
 import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torchvision
 from models import cifar
+from tqdm import tqdm
 
 import flwr as fl
 from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes, Weights
@@ -43,7 +47,7 @@ def train(
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
-
+                
                 # collect statistics
                 running_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1) 
@@ -151,7 +155,7 @@ class DefaultClient(fl.client.Client):
             self.testset, batch_size=32, shuffle=False
         )
         
-        loss, accuracy = test(net=self.model, testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
+        loss, accuracy = self.model.test(testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
 
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(
