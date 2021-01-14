@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torchvision
 from models import cifar
 from tqdm import tqdm
-
+import copy
 
 import flwr as fl
 from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes, Weights
@@ -82,16 +82,28 @@ class PerFedAvgClient(fl.client.Client):
                 alpha_optimizer.zero_grad()
 
                 # forward + backward + optimize
-                
+                                
+                # copy w_t
+                w_t_copy = copy.deepcopy(self.model.get_weights())
+
                 outputs1 = self.model(images1)
                 loss = criterion(outputs1, labels1)
+                # delta = grad(w_t)
                 loss.backward()
+                
+                # ~w_t = w_t - alpha*delta
                 alpha_optimizer.step()
                 
                 beta_optimizer.zero_grad()
+                # f(~w_t)
                 outputs2 = self.model(images2)
                 loss = criterion(outputs2, labels2)
+                
+                # compute ~delta = grad of(~w_t)
                 loss.backward()
+                
+                self.model.set_weights(w_t_copy)
+                # w_t+1 =  w_t - beta * ~delta
                 beta_optimizer.step()
 
                 # collect statistics
@@ -125,7 +137,7 @@ class PerFedAvgClient(fl.client.Client):
 
         # Set model parameters
         self.model.set_weights(weights)
-
+        
         # Train model
         trainloader = torch.utils.data.DataLoader(
             self.trainset, batch_size=batch_size, shuffle=True
@@ -162,15 +174,18 @@ class PerFedAvgClient(fl.client.Client):
         epoch_global = int(config["epoch_global"])
         
         # Generate Client experiment label
-        d = OrderedDict(sorted(config.items()))
-        params = '_'.join([f'{k}_{v}' for k,v in d.items()])
-        exp_name = f'client_{self.cid}' + params
+       # d = OrderedDict(sorted(config.items()))
+       # params = '_'.join([f'{k}_{v}' for k,v in d.items()])
+        #exp_name = f'client_{self.cid}' + params
+        
+        client_name = f'client_{self.cid}_{self.exp_name}'
         
         weights = fl.common.parameters_to_weights(ins.parameters)
-
+        
+        weights_copy = copy.deepcopy(weights)
+        
         # Use provided weights to update the local model
         self.model.set_weights(weights)
-        
         
         # Get test dataset
         testloader = torch.utils.data.DataLoader(
@@ -182,15 +197,25 @@ class PerFedAvgClient(fl.client.Client):
         optimizer.zero_grad()
         # forward + backward + optimize
         data = next(iter(testloader))
-        images, labels = data[0].to(device), data[1].to(device)
+        images, labels = data[0].to(DEVICE), data[1].to(DEVICE)
         outputs = self.model(images)
         loss = nn.CrossEntropyLoss()(outputs, labels)
         loss.backward()
         optimizer.step()
         
         # Evaluate the updated model on the local dataset
-        loss, accuracy =self.model.test(testloader=testloader, device = DEVICE, exp_name=exp_name)
+        loss, accuracy =self.model.test(testloader=testloader, device = DEVICE)
+        
+        # Write to tensorboard 
+        with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
+                writer.add_scalar('Loss/test', loss, epoch_global)
+                writer.add_scalar('Accuracy/test', accuracy, epoch_global)
+        
+        # We use personalisation for evaluation, but shouldn't affect subsequent training, so set
+        # to original params before personalisation.
+        self.model.set_weights(weights_copy)
 
+        
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(
             num_examples=len(self.testset), loss=float(loss), accuracy=float(accuracy)

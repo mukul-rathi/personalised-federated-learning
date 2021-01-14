@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torchvision
 from models import cifar
 from tqdm import tqdm
+import copy 
 
 import flwr as fl
 from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes, Weights
@@ -134,8 +135,63 @@ class DefaultClient(fl.client.Client):
             num_examples_ceil=num_examples_train,
             fit_duration=fit_duration,
         )
-
+    
     def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
+        print(f"Client {self.cid}: evaluate")
+        config = ins.config
+        epoch_global = int(config["epoch_global"])
+        
+        # Generate Client experiment label
+        # d = OrderedDict(sorted(config.items()))
+        # params = '_'.join([f'{k}_{v}' for k,v in d.items()])
+        #exp_name = f'client_{self.cid}' + params
+        
+        client_name = f'client_{self.cid}_{self.exp_name}'
+        
+        weights = fl.common.parameters_to_weights(ins.parameters)
+        
+        weights_copy = copy.deepcopy(weights)
+        
+        # Use provided weights to update the local model
+        self.model.set_weights(weights)
+        
+        # Get test dataset
+        testloader = torch.utils.data.DataLoader(
+            self.testset, batch_size=32, shuffle=True
+        )
+        
+        # Take one step (personalise model)
+        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.alpha)
+        optimizer.zero_grad()
+        # forward + backward + optimize
+        data = next(iter(testloader))
+        images, labels = data[0].to(DEVICE), data[1].to(DEVICE)
+        outputs = self.model(images)
+        loss = nn.CrossEntropyLoss()(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        
+        # Evaluate the updated model on the local dataset
+        loss, accuracy =self.model.test(testloader=testloader, device = DEVICE)
+        
+        # Write to tensorboard 
+        with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
+                writer.add_scalar('Loss/test', loss, epoch_global)
+                writer.add_scalar('Accuracy/test', accuracy, epoch_global)
+        
+        # We use personalisation for evaluation, but shouldn't affect subsequent training, so set
+        # to original params before personalisation.
+        self.model.set_weights(weights_copy)
+
+        
+        # Return the number of evaluation examples and the evaluation result (loss)
+        return EvaluateRes(
+            num_examples=len(self.testset), loss=float(loss), accuracy=float(accuracy)
+        )
+
+
+    
+    def evaluate_without_personalisation(self, ins: EvaluateIns) -> EvaluateRes:
         print(f"Client {self.cid}: evaluate")
         config = ins.config
         epoch_global = int(config["epoch_global"])
