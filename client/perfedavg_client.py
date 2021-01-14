@@ -181,7 +181,7 @@ class PerFedAvgClient(fl.client.Client):
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.alpha)
         optimizer.zero_grad()
         # forward + backward + optimize
-        data = next(testloader)
+        data = next(iter(testloader))
         images, labels = data[0].to(device), data[1].to(device)
         outputs = self.model(images)
         loss = nn.CrossEntropyLoss()(outputs, labels)
@@ -189,7 +189,7 @@ class PerFedAvgClient(fl.client.Client):
         optimizer.step()
         
         # Evaluate the updated model on the local dataset
-        loss, accuracy =self.model.test(testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
+        loss, accuracy =self.model.test(testloader=testloader, device = DEVICE, exp_name=exp_name)
 
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(

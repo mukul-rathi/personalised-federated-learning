@@ -155,7 +155,7 @@ class DefaultClient(fl.client.Client):
             self.testset, batch_size=32, shuffle=False
         )
         
-        loss, accuracy = self.model.test(testloader=testloader, device = DEVICE, epoch_global=epoch_global, exp_name=exp_name)
+        loss, accuracy = self.model.test(testloader=testloader, device = DEVICE, exp_name=exp_name)
 
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(
