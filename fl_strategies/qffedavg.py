@@ -45,6 +45,7 @@ class QffedAvg(FedAvg):
     # pylint: disable=too-many-arguments,too-many-instance-attributes
     def __init__(
         self,
+        eval_train_fn: Callable[[Weights], Tuple[float, float]],
         q_param: float = 0.2,
         qffl_learning_rate: float = 0.1,
         fraction_fit: float = 0.1,
@@ -53,7 +54,6 @@ class QffedAvg(FedAvg):
         min_eval_clients: int = 1,
         min_available_clients: int = 1,
         eval_fn: Optional[Callable[[Weights], Optional[Tuple[float, float]]]] = None,
-        eval_train_fn: Callable[[Weights], Optional[Tuple[float, float]]]
         on_fit_config_fn: Optional[Callable[[int], Dict[str, str]]] = None,
         on_evaluate_config_fn: Optional[Callable[[int], Dict[str, str]]] = None,
         accept_failures: bool = True,
