@@ -155,8 +155,12 @@ class DefaultClient(fl.client.Client):
             self.testset, batch_size=32, shuffle=False
         )
         
-        loss, accuracy = self.model.test(testloader=testloader, device = DEVICE, exp_name=exp_name)
-
+        loss, accuracy = self.model.test(testloader=testloader, device = DEVICE)
+        
+        # Write to tensorboard 
+        with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
+                writer.add_scalar('Loss/test', loss, idx)
+                writer.add_scalar('Accuracy/test', accuracy, idx)
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(
             num_examples=len(self.testset), loss=float(loss), accuracy=float(accuracy)
