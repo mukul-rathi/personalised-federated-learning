@@ -14,6 +14,9 @@
 # ==============================================================================
 """FAIR RESOURCE ALLOCATION IN FEDERATED LEARNING [Li et al., 2020] strategy.
 Paper: https://openreview.net/pdf?id=ByexElSYDr
+
+This is provided in the Flower repo, but I made a copy locally so I could fix bugs in it.
+
 """
 
 
@@ -32,9 +35,8 @@ from flwr.common import (
 )
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
-
-from .aggregate import aggregate_qffl, weighted_loss_avg
-from .fedavg import FedAvg
+from flwr.server.strategy.aggregate import aggregate_qffl, weighted_loss_avg
+from flwr.server.strategy.fedavg import FedAvg
 
 
 class QffedAvg(FedAvg):
@@ -51,6 +53,7 @@ class QffedAvg(FedAvg):
         min_eval_clients: int = 1,
         min_available_clients: int = 1,
         eval_fn: Optional[Callable[[Weights], Optional[Tuple[float, float]]]] = None,
+        eval_train_fn: Callable[[Weights], Optional[Tuple[float, float]]]
         on_fit_config_fn: Optional[Callable[[int], Dict[str, str]]] = None,
         on_evaluate_config_fn: Optional[Callable[[int], Dict[str, str]]] = None,
         accept_failures: bool = True,
@@ -62,6 +65,7 @@ class QffedAvg(FedAvg):
         self.fraction_eval = fraction_eval
         self.min_available_clients = min_available_clients
         self.eval_fn = eval_fn
+        self.eval_train_fn = eval_train_fn
         self.on_fit_config_fn = on_fit_config_fn
         self.on_evaluate_config_fn = on_evaluate_config_fn
         self.accept_failures = accept_failures
@@ -93,6 +97,7 @@ class QffedAvg(FedAvg):
             # No evaluation function provided
             return None
         return self.eval_fn(weights)
+    
 
     def configure_fit(
         self, rnd: int, weights: Weights, client_manager: ClientManager
@@ -176,9 +181,9 @@ class QffedAvg(FedAvg):
             raise Exception("QffedAvg pre_weights are None in aggregate_fit")
 
         weights_before = self.pre_weights
-        eval_result = self.evaluate(weights_before)
-        if eval_result is not None:
-            loss, _ = eval_result
+        
+        # get loss computed on global training set
+        loss,_ = self.eval_train_fn(weights_before)
 
         for _, fit_res in results:
             new_weights = parameters_to_weights(fit_res.parameters)

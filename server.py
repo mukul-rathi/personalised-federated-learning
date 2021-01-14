@@ -29,7 +29,8 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 import flwr as fl
-import models.cifar as cifar
+from models import cifar
+from fl_strategies.qffedavg import QffedAvg
   
 DEFAULT_SERVER_ADDRESS = "[::]:8080"
 
@@ -134,13 +135,13 @@ def main() -> None:
     # Configure logger
     fl.common.logger.configure("server", host=args.log_host)
 
-    # Load evaluation data
-    _, testset = cifar.load_data()
+    # Load training data for qffl to eval on
+    trainset, _ = cifar.load_data()
     
 
     # Create client_manager, strategy, and server
     client_manager = fl.server.SimpleClientManager()
-    strategy = get_strategy(args, testset);
+    strategy = get_strategy(args, trainset);
     server = fl.server.Server(client_manager=client_manager, strategy=strategy)
     
     # Run server 
@@ -198,7 +199,7 @@ def get_eval_fn(
 
 def get_strategy(
     args,
-    testset: torchvision.datasets.CIFAR10
+    trainset: torchvision.datasets.CIFAR10
 ) -> fl.server.strategy.Strategy:
     if args.strategy == "fedAvg":
         return fl.server.strategy.FedAvg(
@@ -217,7 +218,7 @@ def get_strategy(
         if not args.qffl_learning_rate:
             args.qffl_learning_rate = 0.1
         
-        return fl.server.strategy.QffedAvg(
+        return QffedAvg(
             q_param = args.q_param,
             qffl_learning_rate = args.qffl_learning_rate,
             fraction_fit=args.sample_fraction,   
@@ -226,6 +227,7 @@ def get_strategy(
             min_eval_clients=args.min_sample_size,
             min_available_clients=args.min_num_clients,
             eval_fn= None, # so does federated evaluation
+            eval_train_fn = get_eval_fn(trainset)
             on_fit_config_fn=generate_config(args),
             on_evaluate_config_fn=generate_config(args)
         )
