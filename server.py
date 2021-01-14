@@ -109,22 +109,19 @@ def main() -> None:
         type=float,
         help="Learning_rate for QFFedAvg",
     )
+   
     parser.add_argument(
-        "--eta",
+        "--alpha",
         type=float,
-        help="Server-side Learning_rate for FedOpt",
+        help="Server Learning_rate for PerFedAvg",
     )
     parser.add_argument(
-        "--eta_l",
+        "--beta",
         type=float,
-        help="Client-side Learning_rate for FedOpt",
+        help="Client Learning_rate for PerFedAvg",
     )
-    parser.add_argument(
-        "--tau",
-        type=float,
-        help="Tau: degree of adaptability for FedOpt",
-    )
-    
+   
+   
     args = parser.parse_args()
     dict_args = vars(args)
     if not args.exp_name:
@@ -227,7 +224,7 @@ def get_strategy(
             min_eval_clients=args.min_sample_size,
             min_available_clients=args.min_num_clients,
             eval_fn= None, # so does federated evaluation
-            eval_train_fn = get_eval_fn(trainset)
+            eval_train_fn = get_eval_fn(trainset),
             on_fit_config_fn=generate_config(args),
             on_evaluate_config_fn=generate_config(args)
         )
