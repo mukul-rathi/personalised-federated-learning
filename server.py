@@ -154,32 +154,14 @@ def main() -> None:
     hist = server.fit(num_rounds=args.rounds)
     log(INFO, "app_fit: losses_distributed %s", str(hist.losses_distributed))
     log(INFO, "app_fit: accuracies_distributed %s", str(hist.accuracies_distributed))
-    log(INFO, "app_fit: losses_centralized %s", str(hist.losses_centralized))
-    log(INFO, "app_fit: accuracies_centralized %s", str(hist.accuracies_centralized))
-    print(hist.accuracies_centralized)
+    print(hist.accuracies_distributed)
     
     with SummaryWriter(log_dir=f'./runs/{args.exp_name}') as writer:
-        for idx, loss in hist.losses_centralized:
+        for idx, loss in hist.losses_distributed:
             writer.add_scalar('Loss/test', loss, idx*args.epochs)
-        for idx, acc in hist.accuracies_centralized:
+        for idx, acc in hist.accuracies_distributed:
             writer.add_scalar('Accuracy/test', acc, idx*args.epochs)
 
-    # Temporary workaround to force distributed evaluation
-    server.strategy.eval_fn = None  # type: ignore
-
-    # Evaluate the final trained model
-    res = server.evaluate(rnd=-1)
-    if res is not None:
-        loss, (results, failures) = res
-        log(INFO, "app_evaluate: federated loss: %s", str(loss))
-        log(
-            INFO,
-            "app_evaluate: results %s",
-            str([(res[0].cid, res[1]) for res in results]),
-        )
-        log(INFO, "app_evaluate: failures %s", str(failures))
-    else:
-        log(INFO, "app_evaluate: no evaluation result")
 
     # Stop the gRPC server
     grpc_server.stop(1)
@@ -221,11 +203,11 @@ def get_strategy(
     if args.strategy == "fedAvg":
         return fl.server.strategy.FedAvg(
             fraction_fit=args.sample_fraction,
-            fraction_eval=args.sample_fraction,
+            fraction_eval=1,
             min_fit_clients=args.min_sample_size,
             min_eval_clients=args.min_sample_size,
             min_available_clients=args.min_num_clients,
-            eval_fn= get_eval_fn(testset),
+            eval_fn= None, # so does federated evaluation
             on_fit_config_fn=generate_config(args),
             on_evaluate_config_fn=generate_config(args)
         )
@@ -239,11 +221,11 @@ def get_strategy(
             q_param = args.q_param,
             qffl_learning_rate = args.qffl_learning_rate,
             fraction_fit=args.sample_fraction,   
-            fraction_eval=args.sample_fraction,
+            fraction_eval=1,
             min_fit_clients=args.min_sample_size,
             min_eval_clients=args.min_sample_size,
             min_available_clients=args.min_num_clients,
-            eval_fn= get_eval_fn(testset),
+            eval_fn= None, # so does federated evaluation
             on_fit_config_fn=generate_config(args),
             on_evaluate_config_fn=generate_config(args)
         )
@@ -251,11 +233,11 @@ def get_strategy(
         # server strategy is the same, only the client behaviour changes
         return fl.server.strategy.FedAvg(
             fraction_fit=args.sample_fraction,
-            fraction_eval=args.sample_fraction,
+            fraction_eval= 1,
             min_fit_clients=args.min_sample_size,
             min_eval_clients=args.min_sample_size,
             min_available_clients=args.min_num_clients,
-            eval_fn= get_eval_fn(testset),
+            eval_fn= None, # so does federated evaluation
             on_fit_config_fn=generate_config(args),
             on_evaluate_config_fn=generate_config(args)
         )

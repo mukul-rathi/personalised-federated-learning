@@ -141,9 +141,11 @@ class DefaultClient(fl.client.Client):
         epoch_global = int(config["epoch_global"])
         
         # Generate Client experiment label
-        d = OrderedDict(sorted(config.items()))
-        params = '_'.join([f'{k}_{v}' for k,v in d.items()])
-        exp_name = f'client_{self.cid}' + params
+        #d = OrderedDict(sorted(config.items()))
+       # params = '_'.join([f'{k}_{v}' for k,v in d.items()])
+        
+        client_name = f'client_{self.cid}_{self.exp_name}'
+
         
         weights = fl.common.parameters_to_weights(ins.parameters)
 
@@ -159,8 +161,8 @@ class DefaultClient(fl.client.Client):
         
         # Write to tensorboard 
         with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
-                writer.add_scalar('Loss/test', loss, idx)
-                writer.add_scalar('Accuracy/test', accuracy, idx)
+                writer.add_scalar('Loss/test', loss, epoch_global)
+                writer.add_scalar('Accuracy/test', accuracy, epoch_global)
         # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(
             num_examples=len(self.testset), loss=float(loss), accuracy=float(accuracy)
