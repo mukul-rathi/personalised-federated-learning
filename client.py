@@ -101,7 +101,7 @@ def get_client(args, model, trainset, testset):
     if args.strategy=="perFedAvg":
         return PerFedAvgClient(args.cid, model, trainset, testset, f'{args.exp_name}_iid-fraction_{args.iid_fraction}', args.iid_fraction, args.alpha, args.beta)
     
-    return DefaultClient(args.cid, model, trainset, testset, f'{args.exp_name}_iid-fraction_{args.iid_fraction}', args.iid_fraction)
+    return DefaultClient(args.cid, model, trainset, testset, f'{args.exp_name}_iid-fraction_{args.iid_fraction}', args.iid_fraction, args.alpha)
     
     
 

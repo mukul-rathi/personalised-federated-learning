@@ -27,14 +27,15 @@ class DefaultClient(fl.client.Client):
         trainset: torchvision.datasets.CIFAR10,
         testset: torchvision.datasets.CIFAR10,
         exp_name: Optional[str],
-        iid_fraction: Optional[float]
+        iid_fraction: Optional[float],
+        alpha: Optional[float],
     ) -> None:
         self.cid = cid
         self.model = model
         self.trainset = trainset
         self.testset = testset        
         self.exp_name = exp_name if exp_name else 'federated_unspecified'
-        self.alpha = 1e-2
+        self.alpha = alpha if alpha else  1e-2
 
     def train(
         self,

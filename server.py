@@ -110,16 +110,6 @@ def main() -> None:
         help="Learning_rate for QFFedAvg",
     )
    
-    parser.add_argument(
-        "--alpha",
-        type=float,
-        help="Server Learning_rate for PerFedAvg",
-    )
-    parser.add_argument(
-        "--beta",
-        type=float,
-        help="Client Learning_rate for PerFedAvg",
-    )
    
    
     args = parser.parse_args()
