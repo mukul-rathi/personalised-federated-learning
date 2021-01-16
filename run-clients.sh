@@ -17,8 +17,10 @@
 
 
 SERVER_ADDRESS="[::]:8080"
-NUM_CLIENTS=5 # <---Change the number of clients here
-STRATEGY="perFedAvg"
+NUM_CLIENTS=10 # <---Change the number of clients here
+STRATEGY="qffedAvg"
+ALPHA=1e-3
+BETA=1e-3
 
 echo "Starting $NUM_CLIENTS clients."
 for ((i = 0; i < $NUM_CLIENTS; i++))
@@ -28,9 +30,11 @@ do
       --cid=$i \
       --server_address=$SERVER_ADDRESS \
       --num_partitions=${NUM_CLIENTS} \
-      --iid_fraction=1.0 \
+      --iid_fraction=0.1 \
       --strategy=$STRATEGY \
-      --exp_name="${STRATEGY}_federated_${NUM_CLIENTS}_clients" &
+      --alpha=$ALPHA \
+      --beta=$BETA \
+      --exp_name="${STRATEGY}_alpha=${ALPHA}_beta=${BETA}_federated_${NUM_CLIENTS}_clients" &
 done
 echo "Started $NUM_CLIENTS clients."
 

@@ -18,9 +18,10 @@
 # Start a Flower server
 python3.7 server.py \
   --rounds=10 \
-  --epochs=1 \
-  --sample_fraction=1.0 \
+  --epochs=5 \
+  --sample_fraction=0.5 \
   --min_sample_size=5 \
   --min_num_clients=5 \
-  --strategy="perFedAvg"
-
+ --strategy="qffedAvg"  \
+ --qffl_learning_rate=0.1\
+ --q_param=0
