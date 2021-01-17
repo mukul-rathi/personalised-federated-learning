@@ -140,7 +140,6 @@ class DefaultClient(fl.client.Client):
     
     def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
         
-        return self.evaluate_without_personalisation(ins)
         print(f"Client {self.cid}: evaluate")
         config = ins.config
         epoch_global = int(config["epoch_global"])
@@ -157,7 +156,7 @@ class DefaultClient(fl.client.Client):
         weights_copy = copy.deepcopy(weights)
         
         # Use provided weights to update the local model
-        self.model.set_weights(weights)
+        self.model.set_weights(weights_copy)
         
         # Get test dataset
         testloader = torch.utils.data.DataLoader(
@@ -185,14 +184,8 @@ class DefaultClient(fl.client.Client):
         
         # We use personalisation for evaluation, but shouldn't affect subsequent training, so set
         # to original params before personalisation.
-        self.model.set_weights(weights_copy)
-
         
-        # Return the number of evaluation examples and the evaluation result (loss)
-        return EvaluateRes(
-            num_examples=len(self.testset), loss=float(loss), accuracy=float(accuracy)
-        )
-
+        return self.evaluate_without_personalisation(ins)
 
     
     def evaluate_without_personalisation(self, ins: EvaluateIns) -> EvaluateRes:
@@ -219,11 +212,6 @@ class DefaultClient(fl.client.Client):
         
         loss, accuracy = self.model.test(testloader=testloader, device = DEVICE)
         
-        # Write to tensorboard 
-        with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
-                writer.add_scalar('Loss/test', loss, epoch_global)
-                writer.add_scalar('Accuracy/test', accuracy, epoch_global)
-        # Return the number of evaluation examples and the evaluation result (loss)
         return EvaluateRes(
             num_examples=len(self.testset), loss=float(loss), accuracy=float(accuracy)
         )
