@@ -17,10 +17,12 @@
 
 
 SERVER_ADDRESS="[::]:8080"
-NUM_CLIENTS=10 # <---Change the number of clients here
-STRATEGY="qffedAvg"
-ALPHA=1e-2
-BETA=1e-3
+
+STRATEGY=$1
+ALPHA=$2
+BETA=$3
+NUM_CLIENTS=$4 
+IID_FRACTION=$5
 
 echo "Starting $NUM_CLIENTS clients."
 for ((i = 0; i < $NUM_CLIENTS; i++))
@@ -29,8 +31,8 @@ do
     python3.7 client.py \
       --cid=$i \
       --server_address=$SERVER_ADDRESS \
-      --num_partitions=${NUM_CLIENTS} \
-      --iid_fraction=0.1 \
+      --num_partitions=$NUM_CLIENTS \
+      --iid_fraction=$IID_FRACTION \
       --strategy=$STRATEGY \
       --alpha=$ALPHA \
       --beta=$BETA \

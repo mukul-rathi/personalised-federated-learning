@@ -15,6 +15,10 @@
 # limitations under the License.
 # ==============================================================================
 
+STRATEGY=$1
+Q_PARAM=$2
+Q_LR=$3
+
 # Start a Flower server
 python3.7 server.py \
   --rounds=10 \
@@ -22,6 +26,6 @@ python3.7 server.py \
   --sample_fraction=0.5 \
   --min_sample_size=5 \
   --min_num_clients=5 \
- --strategy="qffedAvg"  \
- --qffl_learning_rate=1\
- --q_param=0.01
+ --strategy=$STRATEGY  \
+ --qffl_learning_rate=$Q_LR\
+ --q_param=$Q_PARAM
