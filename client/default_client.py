@@ -16,6 +16,49 @@ from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes,
 
 DEVICE = torch.device("cpu")
 
+def train(
+        net : cifar.Net,
+        trainloader: torch.utils.data.DataLoader,
+        device: torch.device,
+        start_epoch: int,
+        end_epoch: int
+    ) -> List[Tuple[float, float]]:
+        """Train the network."""
+        # Define loss and optimizer
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+
+        print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
+        results = []
+        # Train the network
+        for idx, epoch in enumerate(range(start_epoch, end_epoch+1)):  # loop over the dataset multiple times, last epoch inclusive
+            running_loss = 0.0
+            running_acc  = 0.0
+            total = 0
+            pbar = tqdm(trainloader, 0)
+            for data in pbar:
+                pbar.set_description(f'Epoch {epoch}: Training...')
+                images, labels = data[0].to(device), data[1].to(device)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
+                # forward + backward + optimize
+                outputs = net(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                
+                # collect statistics
+                running_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1) 
+                total += labels.size(0)
+                running_acc += (predicted == labels).sum().item()
+
+            results.append((running_loss/total, running_acc/total))    
+
+        return results      
+
 
 class DefaultClient(fl.client.Client):
     """Default Flower client using global model's weights."""
@@ -35,59 +78,16 @@ class DefaultClient(fl.client.Client):
         self.trainset = trainset
         self.testset = testset        
         self.exp_name = exp_name if exp_name else 'federated_unspecified'
-        self.alpha = alpha if alpha else  1e-2
+        self.alpha = alpha if alpha else 1e-3
 
-    def train(
-        self,
-        trainloader: torch.utils.data.DataLoader,
-        device: torch.device,
-        start_epoch: int,
-        end_epoch: int
-    ) -> List[Tuple[float, float]]:
-        """Train the network."""
-        # Define loss and optimizer
-        criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.alpha, momentum=0.9)
 
-        print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
-        results = []
-        # Train the network
-        for idx, epoch in enumerate(range(start_epoch, end_epoch+1)):  # loop over the dataset multiple times, last epoch inclusive
-            running_loss = 0.0
-            running_acc  = 0.0
-            total = 0
-            pbar = tqdm(trainloader, 0)
-            for data in pbar:
-                pbar.set_description(f'Epoch {epoch}: Training...')
-                images, labels = data[0].to(device), data[1].to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward + backward + optimize
-                outputs = self.model(images)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-                
-                # collect statistics
-                running_loss += loss.item()
-                _, predicted = torch.max(outputs.data, 1) 
-                total += labels.size(0)
-                running_acc += (predicted == labels).sum().item()
-
-            results.append((running_loss/total, running_acc/total))    
-
-        return results      
-
-    
     def get_parameters(self) -> ParametersRes:
         print(f"Client {self.cid}: get_parameters")
 
         weights: Weights = self.model.get_weights()
         parameters = fl.common.weights_to_parameters(weights)
         return ParametersRes(parameters=parameters)
-    
+
     def fit(self, ins: FitIns) -> FitRes:
         print(f"Client {self.cid}: fit")
 
@@ -117,9 +117,8 @@ class DefaultClient(fl.client.Client):
         
         start_epoch = epoch_global+1
         end_epoch = start_epoch + epochs-1
-        results_fit = self.train(trainloader = trainloader, 
-                                        device = DEVICE, 
-                                       start_epoch=start_epoch, end_epoch = end_epoch)
+        results_fit = train(self.model, trainloader = trainloader, 
+                                            device = DEVICE, start_epoch=start_epoch, end_epoch = end_epoch)
         # Write to tensorboard 
         with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
             for idx, result in enumerate(results_fit, start_epoch):
@@ -140,6 +139,8 @@ class DefaultClient(fl.client.Client):
         )
     
     def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
+        
+        return self.evaluate_without_personalisation(ins)
         print(f"Client {self.cid}: evaluate")
         config = ins.config
         epoch_global = int(config["epoch_global"])
