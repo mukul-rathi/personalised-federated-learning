@@ -21,12 +21,13 @@ def train(
         trainloader: torch.utils.data.DataLoader,
         device: torch.device,
         start_epoch: int,
-        end_epoch: int
+        end_epoch: int,
+        alpha : float
     ) -> List[Tuple[float, float]]:
         """Train the network."""
         # Define loss and optimizer
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+        optimizer = torch.optim.SGD(net.parameters(), lr=alpha, momentum=0.9)
 
         print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
         results = []
@@ -118,7 +119,7 @@ class DefaultClient(fl.client.Client):
         start_epoch = epoch_global+1
         end_epoch = start_epoch + epochs-1
         results_fit = train(self.model, trainloader = trainloader, 
-                                            device = DEVICE, start_epoch=start_epoch, end_epoch = end_epoch)
+                                            device = DEVICE, start_epoch=start_epoch, end_epoch = end_epoch, alpha=self.alpha)
         # Write to tensorboard 
         with SummaryWriter(log_dir=f'./runs/{client_name}') as writer:
             for idx, result in enumerate(results_fit, start_epoch):

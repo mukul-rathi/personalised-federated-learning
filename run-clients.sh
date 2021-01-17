@@ -19,7 +19,7 @@
 SERVER_ADDRESS="[::]:8080"
 NUM_CLIENTS=10 # <---Change the number of clients here
 STRATEGY="qffedAvg"
-ALPHA=1e-3
+ALPHA=1e-2
 BETA=1e-3
 
 echo "Starting $NUM_CLIENTS clients."
