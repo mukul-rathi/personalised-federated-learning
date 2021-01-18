@@ -29,7 +29,7 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 import flwr as fl
-from models import cifar
+from models import fashionmnist as dataset
 from fl_strategies.qffedavg import QffedAvg
   
 DEFAULT_SERVER_ADDRESS = "[::]:8080"
@@ -123,7 +123,7 @@ def main() -> None:
     fl.common.logger.configure("server", host=args.log_host)
 
     # Load training data for qffl to eval on
-    trainset, _ = cifar.load_data()
+    trainset, _ = dataset.load_data()
     
 
     # Create client_manager, strategy, and server
@@ -170,12 +170,12 @@ def generate_config(args):
 
 
 def get_eval_fn(
-    testset: torchvision.datasets.CIFAR10,
+    testset: torchvision.datasets.VisionDataset,
 ) -> Callable[[fl.common.Weights], Optional[Tuple[float, float]]]:
     """Return an evaluation function for centralized evaluation."""
     def evaluate(weights: fl.common.Weights) -> Optional[Tuple[float, float]]:
-        """Use the entire CIFAR-10 test set for evaluation."""
-        model = cifar.load_model()
+        """Use the entire dataset-10 test set for evaluation."""
+        model = dataset.load_model()
         model.set_weights(weights)
         model.to(DEVICE)
         testloader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False)
@@ -186,7 +186,7 @@ def get_eval_fn(
 
 def get_strategy(
     args,
-    trainset: torchvision.datasets.CIFAR10
+    trainset: torchvision.datasets.VisionDataset
 ) -> fl.server.strategy.Strategy:
     if args.strategy == "qffedAvg":
         if not args.q_param:

@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torchvision
-from models import cifar
+from models import fashionmnist as dataset
 from tqdm import tqdm
 import copy 
 
@@ -17,7 +17,7 @@ from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, ParametersRes,
 DEVICE = torch.device("cpu")
 
 def train(
-        net : cifar.Net,
+        net : dataset.Net,
         trainloader: torch.utils.data.DataLoader,
         device: torch.device,
         start_epoch: int,
@@ -67,9 +67,9 @@ class DefaultClient(fl.client.Client):
     def __init__(
         self,
         cid: str,
-        model: cifar.Net,
-        trainset: torchvision.datasets.CIFAR10,
-        testset: torchvision.datasets.CIFAR10,
+        model: dataset.Net,
+        trainset: torchvision.datasets.VisionDataset,
+        testset: torchvision.datasets.VisionDataset,
         exp_name: Optional[str],
         iid_fraction: Optional[float],
         alpha: Optional[float],

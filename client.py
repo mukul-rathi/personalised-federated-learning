@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower client example using PyTorch for CIFAR-10 image classification."""
+"""Flower client example using PyTorch for image classification."""
 
 
 import argparse
@@ -20,7 +20,7 @@ import torch
 
 import flwr as fl
 
-from models import cifar
+from models import fashionmnist as dataset
 from client.default_client import DefaultClient
 from client.perfedavg_client import PerFedAvgClient
 from client.perfedavg_hf_client import PerFedAvgHFClient
@@ -86,11 +86,11 @@ def main() -> None:
     fl.common.logger.configure(f"client_{args.cid}", host=args.log_host)
 
     # Load model and data
-    model = cifar.load_model()
+    model = dataset.load_model()
     model.to(DEVICE)
-    trainset, testset = cifar.load_data()
+    trainset, testset = dataset.load_data()
     print(f'Loading data for client {args.cid}')
-    trainset, testset = cifar.load_local_partitioned_data(cid=int(args.cid), 
+    trainset, testset = dataset.load_local_partitioned_data(cid=int(args.cid), 
                                                           iid_fraction = args.iid_fraction, 
                                                           num_partitions = args.num_partitions)
     # Start client
