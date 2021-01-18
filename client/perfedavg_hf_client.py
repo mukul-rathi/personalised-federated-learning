@@ -66,11 +66,12 @@ class PerFedAvgHFClient(fl.client.Client):
         criterion = nn.CrossEntropyLoss()
         alpha_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.alpha)
         beta_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.beta)
-        # beta * (-alpha) * 1/2delta 
-        beta_alpha_dplus_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.beta*(-self.alpha)/(2*self.delta))
-        beta_alpha_dminus_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.beta*(self.alpha)/(2*self.delta))
-        deltaminus_optimizer = torch.optim.SGD(self.model.parameters(), lr=(self.delta))
-        deltaplus_optimizer = torch.optim.SGD(self.model.parameters(), lr=(-self.delta))
+        # for hessian updates 
+        beta_alpha_delta = self.beta*(self.alpha)/(2*self.delta)
+        beta_alpha_delta_optimizer = torch.optim.SGD(self.model.parameters(), lr=beta_alpha_delta)
+        
+        # to compute finite differences
+        delta_optimizer = torch.optim.SGD(self.model.parameters(), lr=(self.delta))
 
         print(f"Training from epoch(s) {start_epoch} to {end_epoch} w/ {len(trainloader)} batches each.", flush=True)
         results = []
@@ -93,6 +94,7 @@ class PerFedAvgHFClient(fl.client.Client):
                 # copy w_t
                 w_t_copy1 = copy.deepcopy(self.model.get_weights())
                 w_t_copy2 = copy.deepcopy(self.model.get_weights())
+                w_t_copy3 = copy.deepcopy(self.model.get_weights())
 
                 outputs1 = self.model(images1)
                 loss = criterion(outputs1, labels1)
@@ -102,9 +104,11 @@ class PerFedAvgHFClient(fl.client.Client):
                 # ~w_t = w_t - alpha*nabla
                 alpha_optimizer.step()
                 
+                w_tilde_copy = copy.deepcopy(self.model.get_weights())
+
+                
                 beta_optimizer.zero_grad()
-                deltaplus_optimizer.zero_grad()
-                deltaminus_optimizer.zero_grad()
+                delta_optimizer.zero_grad()
 
                 # f(~w_t)
                 outputs2 = self.model(images2)
@@ -133,36 +137,47 @@ class PerFedAvgHFClient(fl.client.Client):
                 
                 self.model.set_weights(w_t_copy2)
                 
-                # w_t + d*~nabla
-                deltaplus_optimizer.step()
-                w_t_deltaplus = copy.deepcopy(self.model.get_weights())
+                # w_t - delta*~nabla
+                delta_optimizer.step()
+                w_t_deltaminus = copy.deepcopy(self.model.get_weights())
                 
-                # w_t + d*~nabla - 2*d*~nabla = w_t - d*~nabla
-                deltaminus_optimizer.step()
-                deltaminus_optimizer.step()
                 
-                # f(w_t-d*~nabla)
-                beta_alpha_dminus_optimizer.zero_grad()
+                delta_optimizer.zero_grad()
+                
+                self.model.set_weights(w_tilde_copy)
+                # f(~w_t)
+                outputs2 = self.model(images2)
+                loss = criterion(outputs2, labels2)
+                
+                # compute -ve ~nabla = grad of f(~w_t)
+                (-loss).backward()
+                
+                self.model.set_weights(w_t_copy3)
+                #  w_t + d*~nabla
+                delta_optimizer.step()
+                
+                # f(w_t+delta*~nabla)
+                beta_alpha_delta_optimizer.zero_grad()
+                outputs3 = self.model(images3)
+                loss = criterion(outputs3, labels3)
+                # compute nabla_dplus = - grad of (w_t + delta*~nabla)
+                (-loss).backward()
+                
+                self.model.set_weights(w_t_fo)
+                beta_alpha_delta_optimizer.step()
+                w_t_fo_dplus = self.model.get_weights()
+                
+                
+                self.model.set_weights(w_t_deltaminus)
+                beta_alpha_delta_optimizer.zero_grad()
+                # f(w_t+d*~nabla)
                 outputs3 = self.model(images3)
                 loss = criterion(outputs3, labels3)
                 # compute nabla_dminus = grad of (w_t-d*~nabla)
                 loss.backward()
                 
-                self.model.set_weights(w_t_fo)
-                beta_alpha_dminus_optimizer.step()
-                w_t_fo_dminus = self.model.get_weights()
-                
-                
-                self.model.set_weights(w_t_deltaplus)
-                beta_alpha_dplus_optimizer.zero_grad()
-                # f(w_t+d*~nabla)
-                outputs3 = self.model(images3)
-                loss = criterion(outputs3, labels3)
-                # compute nabla_dplus = grad of (w_t-d*~nabla)
-                loss.backward()
-                
-                self.model.set_weights(w_t_fo_dminus)
-                beta_alpha_dplus_optimizer.step()
+                self.model.set_weights(w_t_fo_dplus)
+                beta_alpha_delta_optimizer.step()
                 
                 
       
