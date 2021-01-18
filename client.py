@@ -23,6 +23,7 @@ import flwr as fl
 from models import cifar
 from client.default_client import DefaultClient
 from client.perfedavg_client import PerFedAvgClient
+from client.perfedavg_hf_client import PerFedAvgHFClient
 
 DEFAULT_SERVER_ADDRESS = "[::]:8080"
 
@@ -100,7 +101,8 @@ def main() -> None:
 def get_client(args, model, trainset, testset):
     if args.strategy=="perFedAvg":
         return PerFedAvgClient(args.cid, model, trainset, testset, f'{args.exp_name}_iid-fraction_{args.iid_fraction}', args.iid_fraction, args.alpha, args.beta)
-    
+    elif args.strategy=="perFedAvgHF":
+        return PerFedAvgHFClient(args.cid, model, trainset, testset, f'{args.exp_name}_iid-fraction_{args.iid_fraction}', args.iid_fraction, args.alpha, args.beta)
     return DefaultClient(args.cid, model, trainset, testset, f'{args.exp_name}_iid-fraction_{args.iid_fraction}', args.iid_fraction, args.alpha)
     
     

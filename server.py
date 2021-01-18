@@ -188,18 +188,7 @@ def get_strategy(
     args,
     trainset: torchvision.datasets.CIFAR10
 ) -> fl.server.strategy.Strategy:
-    if args.strategy == "fedAvg":
-        return fl.server.strategy.FedAvg(
-            fraction_fit=args.sample_fraction,
-            fraction_eval=1,
-            min_fit_clients=args.min_sample_size,
-            min_eval_clients=args.min_sample_size,
-            min_available_clients=args.min_num_clients,
-            eval_fn= None, # so does federated evaluation
-            on_fit_config_fn=generate_config(args),
-            on_evaluate_config_fn=generate_config(args)
-        )
-    elif args.strategy == "qffedAvg":
+    if args.strategy == "qffedAvg":
         if not args.q_param:
             args.q_param = 0.2
         if not args.qffl_learning_rate:
@@ -218,18 +207,17 @@ def get_strategy(
             on_fit_config_fn=generate_config(args),
             on_evaluate_config_fn=generate_config(args)
         )
-    elif args.strategy == "perFedAvg":
-        # server strategy is the same, only the client behaviour changes
-        return fl.server.strategy.FedAvg(
-            fraction_fit=args.sample_fraction,
-            fraction_eval= 1,
-            min_fit_clients=args.min_sample_size,
-            min_eval_clients=args.min_sample_size,
-            min_available_clients=args.min_num_clients,
-            eval_fn= None, # so does federated evaluation
-            on_fit_config_fn=generate_config(args),
-            on_evaluate_config_fn=generate_config(args)
-        )
+    # perfedavg same as fedavg, only client differs
+    return fl.server.strategy.FedAvg(
+        fraction_fit=args.sample_fraction,
+        fraction_eval= 1,
+        min_fit_clients=args.min_sample_size,
+        min_eval_clients=args.min_sample_size,
+        min_available_clients=args.min_num_clients,
+        eval_fn= None, # so does federated evaluation
+        on_fit_config_fn=generate_config(args),
+        on_evaluate_config_fn=generate_config(args)
+    )
 
 
 if __name__ == "__main__":
