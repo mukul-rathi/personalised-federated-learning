@@ -49,12 +49,12 @@ tex_fonts = {
 "text.usetex": False,
 "font.family": "serif",
 # Use 10pt font in plots, to match 10pt font in document
-"axes.labelsize": 10,
-"font.size": 10,
+"axes.labelsize": 8,
+"font.size": 8,
 # Make the legend/label fonts a little smaller
-"legend.fontsize": 8,
-"xtick.labelsize": 8,
-"ytick.labelsize": 8
+"legend.fontsize": 7,
+"xtick.labelsize": 7,
+"ytick.labelsize": 7
 }
 plt.rcParams.update(tex_fonts)
 
@@ -65,15 +65,17 @@ for directory,_ , _ in os.walk("./completed_runs"):
 
     
     # Initialise figure instance
-    test_fig, test_ax = plt.subplots(1, 1, figsize=set_size(0.45))
-    train_fig, train_ax = plt.subplots(1, 1, figsize=set_size(0.45))
+    test_fig, test_ax = plt.subplots(1, 1, figsize=set_size(0.4))
+    train_fig, train_ax = plt.subplots(1, 1, figsize=set_size(0.4))
 
     # Plot
     test_ax.set_xlim(0, 50)
+    test_ax.set_ylim(0, 1)
     test_ax.set_xlabel("Epochs")
     test_ax.set_ylabel("Accuracy (test)")
     
     train_ax.set_xlim(0, 50)
+    train_ax.set_ylim(0, 1)
     train_ax.set_xlabel("Epochs")
     train_ax.set_ylabel("Accuracy (train)")
     
@@ -88,18 +90,19 @@ for directory,_ , _ in os.walk("./completed_runs"):
         #print(*event_acc.Scalars('Accuracy/test'))
         _, test_step, test_acc = zip(*event_acc.Scalars('Accuracy/test'))
         test_accs.append((test_step,test_acc))
-        #_, train_step, train_acc = zip(*event_acc.Scalars('Accuracy/train'))
-        #train_accs.append((train_step,train_acc))
+        _, train_step, train_acc = zip(*event_acc.Scalars('Accuracy/train'))
+        train_accs.append((train_step,train_acc))
         
         
     if test_accs:
         for (x,y) in test_accs:
             test_ax.plot(x, y)
-        print(directory)
+        print("Testing: " + directory )
         test_fig.savefig(directory + '/test_acc.pdf', format='pdf', bbox_inches='tight')
     if train_accs:
         for (x,y) in train_accs:
             train_ax.plot(x, y)
+        print("Training: " + directory )
         train_fig.savefig(directory + '/train_acc.pdf', format='pdf', bbox_inches='tight')
     plt.close(train_fig)
     plt.close(test_fig)
