@@ -1,3 +1,5 @@
+# Credit https://jwalton.info/Embed-Publication-Matplotlib-Latex/
+
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 from glob import glob
 import os
